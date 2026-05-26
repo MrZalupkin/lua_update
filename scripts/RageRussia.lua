@@ -1,4 +1,4 @@
-script_version("25.05.2026-2")
+script_version("25.05.2026-3")
 script_name("Rage Russia BP")
 script_authors("mofbe")
 script_description("https://www.blast.hk/threads/254680/")
@@ -1182,265 +1182,184 @@ function sendRpc243_12()
     raknetDeleteBitStream(bs)
 end
 
-local AutoUpdater = {}
-AutoUpdater.__index = AutoUpdater
-local dlstatus = require('moonloader').download_status
+local dlstatus = require("moonloader").download_status
 
-function AutoUpdater:new(config)
-    local skrrrrrrrr = thisScript()
-    local obj = {
-        ptrScrrrr = skrrrrrrrr,
-        scriptName = config.scriptName or skrrrrrrrr.name,
-        scriptVersion = config.scriptVersion or skrrrrrrrr.version,
-        manifestUrl = config.manifestUrl,
+local UPDATE_IN_PROGRESS = false
 
-        silent = false,
-
-        manifestPath = getWorkingDirectory() .. "\\update_manifest.tmp",
-        updatePath = skrrrrrrrr.path .. ".update",
-        backupPath = skrrrrrrrr.path .. ".backup",
-
-        remoteInfo = nil,
-        checking = false,
-        downloading = false
-    }
-
-    setmetatable(obj, self)
-    return obj
-end
-
-function AutoUpdater:msg(text)
-    log(u8:decode(text))
-end
-
-function AutoUpdater:readFile(path)
-    local file = io.open(path, "rb")
-    if not file then
-        return nil
-    end
-
-    local data = file:read("*a")
-    file:close()
-
-    return data
-end
-
-function AutoUpdater:deleteFile(path)
-    if path then
-        os.remove(path)
-    end
-end
-
-function AutoUpdater:clearTempFiles()
-    self:deleteFile(self.manifestPath)
-    self:deleteFile(self.updatePath)
-end
-
-function AutoUpdater:isNewVersion(remoteVersion)
-    if not remoteVersion or remoteVersion == "" then
-        return false
-    end
-
-    return tostring(remoteVersion) ~= tostring(self.scriptVersion)
-end
-
-function AutoUpdater:getManifestUrl()
-    local separator = self.manifestUrl:find("?", 1, true) and "&" or "?"
-    return self.manifestUrl .. separator .. "t=" .. os.time()
-end
-
-function AutoUpdater:getDownloadUrl()
-    if not self.remoteInfo or not self.remoteInfo.url then
-        return nil
-    end
-
-    local url = self.remoteInfo.url
-    local separator = url:find("?", 1, true) and "&" or "?"
-
-    return url .. separator .. "t=" .. os.time()
-end
-
-function AutoUpdater:parseManifest(data)
-    local ok, decoded = pcall(decodeJson, data)
-
-    if not ok or type(decoded) ~= "table" then
-        return nil, "manifest json decode error"
-    end
-
-    if type(decoded.scripts) ~= "table" then
-        return nil, "manifest does not contain scripts"
-    end
-
-    local info = decoded.scripts[self.scriptName]
-
-    if type(info) ~= "table" then
-        return nil, "script not found in manifest: " .. tostring(self.scriptName)
-    end
-
-    if not info.version or not info.url then
-        return nil, "script info does not contain version or url"
-    end
-
-    return info, nil
-end
-
-function AutoUpdater:validateDownloadedScript(data)
-    if not data or #data < 50 then
-        return false, "файл пустой или слишком маленький"
-    end
-
-    if not data:find("script_name", 1, true) and not data:find("script_version", 1, true) then
-        return false, "файл не похож на MoonLoader Lua-скрипт"
-    end
-
-    return true, nil
-end
-
-function AutoUpdater:replaceScript()
-    self:deleteFile(self.backupPath)
-
-    local currentPath = self.skrrrrrrrr.path
-
-    local backupOk = os.rename(currentPath, self.backupPath)
-
-    if not backupOk then
-        return false, "не удалось создать backup"
-    end
-
-    local replaceOk = os.rename(self.updatePath, currentPath)
-
-    if not replaceOk then
-        os.rename(self.backupPath, currentPath)
-        return false, "не удалось заменить текущий файл"
-    end
-
-    return true, nil
-end
-
-function AutoUpdater:download()
-    if self.downloading then
-        self:msg("Обновление уже скачивается.")
+function checkAutoUpdate(manifestUrl)
+    if UPDATE_IN_PROGRESS then
+        log("Автообновление уже выполняется.")
         return
     end
 
-    if not self.remoteInfo then
-        self:msg("Сначала проверь обновление командой /bpcheck.")
-        return
+    UPDATE_IN_PROGRESS = true
+
+    local script = thisScript()
+    local scriptName = script.name
+    local localVersion = tostring(script.version)
+
+    local manifestPath = getWorkingDirectory() .. "\\" .. scriptName .. "_manifest.tmp"
+    local updatePath = script.path .. ".update"
+    local backupPath = script.path .. ".backup"
+
+    if doesFileExist(manifestPath) then os.remove(manifestPath) end
+    if doesFileExist(updatePath) then os.remove(updatePath) end
+
+    local function msg(text)
+        log(u8:decode(text))
     end
 
-    if not self:isNewVersion(self.remoteInfo.version) then
-        self:msg("У тебя уже актуальная версия.")
-        return
+    local function readFile(path)
+        local f = io.open(path, "rb")
+        if not f then return nil end
+        local data = f:read("*a")
+        f:close()
+        return data
     end
 
-    local url = self:getDownloadUrl()
-
-    if not url then
-        self:msg("В manifest нет ссылки на обновление.")
-        return
+    local function cacheBust(url)
+        local sep = url:find("?", 1, true) and "&" or "?"
+        return url .. sep .. "t=" .. os.time()
     end
 
-    self.downloading = true
-    self:deleteFile(self.updatePath)
+    local function finish()
+        UPDATE_IN_PROGRESS = false
+    end
 
-    self:msg("Скачиваю обновление...")
+    msg("Проверяю обновление...")
 
-    downloadUrlToFile(url, self.updatePath, function(id, status)
+    downloadUrlToFile(cacheBust(manifestUrl), manifestPath, function(id, status, p1, p2)
         if status == dlstatus.STATUS_ENDDOWNLOADDATA then
-            self.downloading = false
+            local manifestData = readFile(manifestPath)
+            if doesFileExist(manifestPath) then os.remove(manifestPath) end
 
-            local data = self:readFile(self.updatePath)
-            local valid, err = self:validateDownloadedScript(data)
-
-            if not valid then
-                self:deleteFile(self.updatePath)
-                self:msg("Ошибка обновления: " .. tostring(err))
+            if not manifestData or #manifestData == 0 then
+                msg("Не удалось прочитать manifest.json.")
+                finish()
                 return
             end
 
-            local ok, replaceErr = self:replaceScript()
-
-            if not ok then
-                self:deleteFile(self.updatePath)
-                self:msg("Ошибка замены файла: " .. tostring(replaceErr))
+            local ok, manifest = pcall(decodeJson, manifestData)
+            if not ok or type(manifest) ~= "table" then
+                msg("Ошибка decodeJson manifest.json.")
+                finish()
                 return
             end
 
-            self:msg("Обновление установлено. Перезагружаю скрипт...")
+            if type(manifest.scripts) ~= "table" then
+                msg("В manifest.json нет таблицы scripts.")
+                finish()
+                return
+            end
+
+            local info = manifest.scripts[scriptName]
+            if type(info) ~= "table" then
+                msg("В manifest.json нет скрипта: " .. tostring(scriptName))
+                finish()
+                return
+            end
+
+            local remoteVersion = tostring(info.version or "")
+            local updateUrl = tostring(info.url or "")
+
+            if remoteVersion == "" or updateUrl == "" then
+                msg("В manifest.json нет version или url.")
+                finish()
+                return
+            end
+
+            msg(remoteVersion .. " ~= " .. localVersion)
+
+            if remoteVersion == localVersion then
+                msg("Обновлений нет. Версия: " .. localVersion)
+                finish()
+                return
+            end
+
+            msg("Найдена новая версия: " .. remoteVersion)
 
             lua_thread.create(function()
-                wait(1000)
-                self.ptrScrrrr:reload()
+                wait(700)
+
+                if doesFileExist(updatePath) then os.remove(updatePath) end
+
+                msg("Скачиваю обновление...")
+
+                downloadUrlToFile(cacheBust(updateUrl), updatePath, function(id2, status2, p12, p22)
+                    if status2 == dlstatus.STATUS_DOWNLOADINGDATA then
+                        -- Можно убрать, чтобы не спамило лог
+                        -- print(string.format("Загружено %d из %d.", p12, p22))
+
+                    elseif status2 == dlstatus.STATUS_ENDDOWNLOADDATA then
+                        local newScript = readFile(updatePath)
+
+                        if not newScript or #newScript < 50 then
+                            if doesFileExist(updatePath) then os.remove(updatePath) end
+                            msg("Ошибка: скачанный файл пустой или слишком маленький.")
+                            finish()
+                            return
+                        end
+
+                        if not newScript:find("script_name", 1, true) and not newScript:find("script_version", 1, true) then
+                            if doesFileExist(updatePath) then os.remove(updatePath) end
+                            msg("Ошибка: скачанный файл не похож на Lua-скрипт.")
+                            finish()
+                            return
+                        end
+
+                        if doesFileExist(backupPath) then os.remove(backupPath) end
+
+                        local backupOk = os.rename(script.path, backupPath)
+                        if not backupOk then
+                            if doesFileExist(updatePath) then os.remove(updatePath) end
+                            msg("Ошибка: не удалось создать backup.")
+                            finish()
+                            return
+                        end
+
+                        local replaceOk = os.rename(updatePath, script.path)
+                        if not replaceOk then
+                            os.rename(backupPath, script.path)
+                            if doesFileExist(updatePath) then os.remove(updatePath) end
+                            msg("Ошибка: не удалось заменить файл скрипта.")
+                            finish()
+                            return
+                        end
+
+                        msg("Обновление завершено. Перезагружаю скрипт...")
+
+                        lua_thread.create(function()
+                            wait(1000)
+                            finish()
+                            script:reload()
+                        end)
+
+                    elseif status2 == dlstatus.STATUS_ERROR then
+                        if doesFileExist(updatePath) then os.remove(updatePath) end
+                        msg("Ошибка загрузки обновления.")
+                        finish()
+                    end
+                end)
             end)
+
         elseif status == dlstatus.STATUS_ERROR then
-            self.downloading = false
-            self:deleteFile(self.updatePath)
-            self:msg("Ошибка загрузки файла обновления.")
+            if doesFileExist(manifestPath) then os.remove(manifestPath) end
+            msg("Ошибка загрузки manifest.json.")
+            finish()
         end
     end)
 end
-
-function AutoUpdater:checkAndDownload()
-    if self.checking or self.downloading then
-        self:msg("Проверка или загрузка уже выполняется.")
-        return
-    end
-
-    self.checking = true
-    self.remoteInfo = nil
-
-    self:deleteFile(self.manifestPath)
-    self:msg("Проверяю обновление...")
-
-    downloadUrlToFile(self:getManifestUrl(), self.manifestPath, function(id, status)
-        if status == dlstatus.STATUS_ENDDOWNLOADDATA then
-            self.checking = false
-
-            local data = self:readFile(self.manifestPath)
-            self:deleteFile(self.manifestPath)
-
-            if not data or #data == 0 then
-                self:msg("Не удалось прочитать manifest.json.")
-                return
-            end
-
-            local info, err = self:parseManifest(data)
-
-            if not info then
-                self:msg("Неверный manifest.json: " .. tostring(err))
-                return
-            end
-
-            self.remoteInfo = info
-
-            if self:isNewVersion(info.version) then
-                self:msg("Найдена новая версия: " .. tostring(info.version))
-                self:download()
-            else
-                self:msg("Обновлений нет. Версия: " .. tostring(self.scriptVersion))
-            end
-        elseif status == dlstatus.STATUS_ERROR then
-            self.checking = false
-            self:deleteFile(self.manifestPath)
-            self:msg("Ошибка загрузки manifest.json.")
-        end
-    end)
-end
-
-local updater = AutoUpdater:new({
-    manifestUrl = "https://raw.githubusercontent.com/MrZalupkin/lua_update/main/manifest.json"
-})
 
 function main()
     math.randomseed(os.time())
 
     repeat wait(100) until isSampAvailable()
 
-    updater:checkAndDownload()
+    checkAutoUpdate("https://raw.githubusercontent.com/MrZalupkin/lua_update/main/manifest.json")
 
-    repeat
-        wait(220)
-    until not updater.checking and not updater.downloading
+    while UPDATE_IN_PROGRESS do
+        wait(100)
+    end
 
     local skrrrrrrrr = thisScript()
     log(u8:decode(string.format("Обход на {ff0000}рэг{ffffff} рашу загружен. Автор: {613dff}%s{ffffff}.", skrrrrrrrr.authors[0])))
