@@ -1268,7 +1268,7 @@ function checkAutoUpdate(manifestUrl)
                 return
             end
 
-            msg(remoteVersion .. " ~= " .. localVersion)
+            -- msg(remoteVersion .. " ~= " .. localVersion)
 
             if remoteVersion == localVersion then
                 msg("Обновлений нет. Версия: " .. localVersion)
@@ -1362,7 +1362,7 @@ function main()
     end
 
     local skrrrrrrrr = thisScript()
-    log(u8:decode(string.format("Обход на {ff0000}рэг{ffffff} рашу загружен. Автор: {613dff}%s{ffffff}.", unpack(skrrrrrrrr.author))))
+    log(u8:decode(string.format("Обход на {ff0000}рэг{ffffff} рашу загружен. Автор: {613dff}%s{ffffff}.", skrrrrrrrr.authors[1])))
     log(u8:decode(string.format("Тема blast.hk: %s.", skrrrrrrrr.description)))
 
     while true do
