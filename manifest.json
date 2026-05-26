@@ -1,7 +1,7 @@
 {
   "scripts": {
     "Rage Russia BP": {
-      "version": "25.05.2026",
+      "version": "25.05.2026-1",
       "date": "25.05.2026",
       "url": "https://raw.githubusercontent.com/MrZalupkin/lua_update/main/scripts/RageRussia.lua",
       "sha256": "",
