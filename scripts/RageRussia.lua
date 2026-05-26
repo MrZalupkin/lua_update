@@ -1,6 +1,6 @@
-script_version("25.05.2026-1")
+script_version("25.05.2026-2")
 script_name("Rage Russia BP")
-script_author("mofbe")
+script_authors("mofbe")
 script_description("https://www.blast.hk/threads/254680/")
 
 require "lib.moonloader"
@@ -1370,7 +1370,7 @@ function AutoUpdater:download()
 
             lua_thread.create(function()
                 wait(1000)
-                self.skrrrrrrrr:reload()
+                self.ptrScrrrr:reload()
             end)
         elseif status == dlstatus.STATUS_ERROR then
             self.downloading = false
@@ -1443,7 +1443,8 @@ function main()
     until not updater.checking and not updater.downloading
 
     local skrrrrrrrr = thisScript()
-    log(u8:decode(string.format("Обход на {ff0000}рэг{ffffff} рашу загружен. Автор: {613dff}%s{ffffff}. %s", skrrrrrrrr.authors[0], skrrrrrrrr.description)))
+    log(u8:decode(string.format("Обход на {ff0000}рэг{ffffff} рашу загружен. Автор: {613dff}%s{ffffff}.", skrrrrrrrr.authors[0])))
+    log(u8:decode(string.format("Тема blast.hk: %s.", skrrrrrrrr.description)))
 
     while true do
         wait(0)
