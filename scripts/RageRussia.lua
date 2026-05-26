@@ -1,6 +1,6 @@
 script_version("25.05.2026-3")
 script_name("Rage Russia BP")
-script_authors("mofbe")
+script_author("mofbe")
 script_description("https://www.blast.hk/threads/254680/")
 
 require "lib.moonloader"
@@ -1362,7 +1362,7 @@ function main()
     end
 
     local skrrrrrrrr = thisScript()
-    log(u8:decode(string.format("Обход на {ff0000}рэг{ffffff} рашу загружен. Автор: {613dff}%s{ffffff}.", skrrrrrrrr.authors[0])))
+    log(u8:decode(string.format("Обход на {ff0000}рэг{ffffff} рашу загружен. Автор: {613dff}%s{ffffff}.", unpack(skrrrrrrrr.author))))
     log(u8:decode(string.format("Тема blast.hk: %s.", skrrrrrrrr.description)))
 
     while true do
